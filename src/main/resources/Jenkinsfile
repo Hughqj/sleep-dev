@@ -1,0 +1,57 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION = 'us-west-2'
+        ECR_REPO = 'sleep-dev'
+        EKS_CLUSTER = 'sleep-dev-v2'
+        GITHUB_REPO = 'https://github.com/Hughqj/sleep-dev.git'
+        AWS_ACCOUNT_ID = '305090498954'
+        EKS_NAMESPACE = 'sleep-dev-pod'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: env.GITHUB_REPO
+            }
+        }
+
+        stage('Build Image') {
+            steps {
+                script {
+                    // 使用 Docker 构建镜像
+                    sh 'docker build -t $ECR_REPO:latest .'
+                }
+            }
+        }
+
+        stage('Push to ECR') {
+            steps {
+                script {
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                        sh '''
+                        $(aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com)
+                        docker tag $ECR_REPO:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                        docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to EKS') {
+            steps {
+                script {
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                        sh '''
+                        aws eks --region $AWS_REGION update-kubeconfig --name $EKS_CLUSTER
+                        kubectl set image deployment/your-deployment your-container=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest -n $EKS_NAMESPACE
+                        kubectl rollout status deployment/your-deployment -n $EKS_NAMESPACE
+                        '''
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "sleep-dev-pipeline",
+  "description": "My EC2 Image Builder Pipeline",
+  "imageRecipeArn": "arn:aws:imagebuilder:us-east-2:305090498954:image-recipe/sleep-dev-formula/1.0.0",
+  "infrastructureConfigurationArn": "arn:aws:imagebuilder:us-east-2:305090498954:infrastructure-configuration/sleep-dev-pipeline-08ae2d91-4853-44c1-99fd-73ee53030c95"
+}
