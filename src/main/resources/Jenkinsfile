@@ -4,7 +4,7 @@ pipeline {
     environment {
         AWS_REGION = 'us-east-2'
         ECR_REPO = 'sleep-dev'
-        EKS_CLUSTER = 'sleep-dev-v2'
+        EKS_CLUSTER = 'sleep-dev-v1'
         GITHUB_REPO = 'https://github.com/Hughqj/sleep-dev.git'
         AWS_ACCOUNT_ID = '305090498954'
         EKS_NAMESPACE = 'sleep-dev-pod'
