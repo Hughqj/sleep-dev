@@ -23,6 +23,30 @@ pipeline {
             }
         }
 
+        stage('Get Version') {
+            steps {
+                script {
+                    // 读取 Maven 项目的版本号
+                    def version = sh(
+                        script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout",
+                        returnStdout: true
+                    ).trim()
+                    env.APP_VERSION = version
+                    echo "Project version: ${env.APP_VERSION}"
+                }
+            }
+        }
+
+        stage('Update Dockerfile') {
+            steps {
+                script {
+                    // 更新 Dockerfile 中的 JAR 文件名
+                    sh """
+                    sed -i 's|sleep-dev-.*-SNAPSHOT.jar|sleep-dev-${env.APP_VERSION}.jar|' Dockerfile
+                    """
+                }
+            }
+        }
         stage('Build Image') {
             steps {
                 script {
