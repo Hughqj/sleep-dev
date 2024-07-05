@@ -11,7 +11,7 @@
     <groupId>com.example</groupId>
     <artifactId>sleep-dev</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <packaging>war</packaging>
+    <packaging>jar</packaging>
     <name>sleep-dev</name>
     <description>sleep-dev</description>
     <url/>
@@ -47,6 +47,7 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
 
     <build>
         <plugins>
