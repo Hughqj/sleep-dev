@@ -78,8 +78,8 @@ pipeline {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                         sh '''
                         aws eks --region $AWS_REGION update-kubeconfig --name $EKS_CLUSTER
-                        $KUBECTL_PATH set image deployment/your-deployment your-container=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest -n $EKS_NAMESPACE
-                        $KUBECTL_PATH rollout status deployment/your-deployment -n $EKS_NAMESPACE
+                        $KUBECTL_PATH set image deployment/sleep your-container=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest -n $EKS_NAMESPACE
+                        $KUBECTL_PATH rollout status deployment/sleep -n $EKS_NAMESPACE
                         '''
                     }
                 }
