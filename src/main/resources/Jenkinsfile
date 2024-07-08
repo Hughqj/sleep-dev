@@ -7,7 +7,7 @@ pipeline {
         EKS_CLUSTER = 'sleep-dev-v1'
         GITHUB_REPO = 'https://github.com/Hughqj/sleep-dev.git'
         AWS_ACCOUNT_ID = '305090498954'
-        EKS_NAMESPACE = 'sleep-dev-pod'
+        EKS_NAMESPACE = 'dev'
         KUBECTL_PATH = '/root/bin/kubectl'  // 使用 kubectl 的绝对路径
     }
 
