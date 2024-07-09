@@ -18,4 +18,9 @@ public class HealthController {
     public String health() {
         return "200";
     }
+    @ResponseBody
+    @RequestMapping("health1")
+    public String health1() {
+        return "2001";
+    }
 }
