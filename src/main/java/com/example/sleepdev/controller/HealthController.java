@@ -21,6 +21,6 @@ public class HealthController {
     @ResponseBody
     @RequestMapping("health1")
     public String health1() {
-        return "2001";
+        return "2002";
     }
 }
