@@ -33,7 +33,16 @@ pipeline {
                         returnStdout: true
                     ).trim()
                     env.APP_VERSION = version
+
+                    // 获取当前时间戳
+                    def timestamp = sh(
+                        script: "date +%Y%m%d%H%M%S",
+                        returnStdout: true
+                    ).trim()
+                    env.VERSION_TAG = "${env.APP_VERSION}-${timestamp}"
+
                     echo "Project version: ${env.APP_VERSION}"
+                    echo "Version tag: ${env.VERSION_TAG}"
                 }
             }
         }
@@ -52,8 +61,8 @@ pipeline {
         stage('Build Image') {
             steps {
                 script {
-                    // 使用 Docker 构建镜像
-                    sh 'docker build -t $ECR_REPO:latest .'
+                    // 使用 Docker 构建镜像，并添加版本标签
+                    sh 'docker build -t $ECR_REPO:$VERSION_TAG .'
                 }
             }
         }
@@ -64,8 +73,8 @@ pipeline {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                         sh '''
                         aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-                        docker tag $ECR_REPO:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
-                        docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+                        docker tag $ECR_REPO:$VERSION_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$VERSION_TAG
+                        docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$VERSION_TAG
                         '''
                     }
                 }
@@ -78,7 +87,7 @@ pipeline {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                         sh '''
                         aws eks --region $AWS_REGION update-kubeconfig --name $EKS_CLUSTER
-                        $KUBECTL_PATH set image deployment/sleep sleep=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest -n $EKS_NAMESPACE
+                        $KUBECTL_PATH set image deployment/sleep sleep=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$VERSION_TAG -n $EKS_NAMESPACE
                         $KUBECTL_PATH rollout status deployment/sleep -n $EKS_NAMESPACE
                         '''
                     }
