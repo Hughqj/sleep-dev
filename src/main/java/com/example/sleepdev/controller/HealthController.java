@@ -29,4 +29,10 @@ public class HealthController {
     public String health2() {
         return "3001";
     }
+
+    @ResponseBody
+    @RequestMapping("health3")
+    public String health3() {
+        return "4001";
+    }
 }
