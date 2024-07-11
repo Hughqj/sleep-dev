@@ -33,6 +33,6 @@ public class HealthController {
     @ResponseBody
     @RequestMapping("health3")
     public String health3() {
-        return "4001";
+        return "4002";
     }
 }
