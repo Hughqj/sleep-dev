@@ -89,6 +89,11 @@ pipeline {
                         # 获取当前任务定义
                         TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition $ECS_TASK_DEFINITION)
 
+                        if [ -z "$TASK_DEFINITION" ]; then
+                            echo "Error: Task definition $ECS_TASK_DEFINITION not found."
+                            exit 1
+                        fi
+
                         # 提取容器定义并更新镜像版本
                         CONTAINER_DEFINITIONS=$(echo $TASK_DEFINITION | jq --arg IMAGE "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$VERSION_TAG" '.taskDefinition.containerDefinitions | map(if .name == "sleep-app" then .image = $IMAGE else . end)')
 
