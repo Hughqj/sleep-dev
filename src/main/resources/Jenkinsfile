@@ -86,7 +86,10 @@ pipeline {
                 script {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                         sh '''
+                        set -e
+
                         # 获取当前任务定义
+                        echo "Fetching current task definition: $ECS_TASK_DEFINITION"
                         TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition $ECS_TASK_DEFINITION)
 
                         if [ -z "$TASK_DEFINITION" ]; then
@@ -94,15 +97,24 @@ pipeline {
                             exit 1
                         fi
 
+                        echo "Task definition fetched successfully: $TASK_DEFINITION"
+
                         # 提取容器定义并更新镜像版本
+                        echo "Updating container definitions with new image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$VERSION_TAG"
                         CONTAINER_DEFINITIONS=$(echo $TASK_DEFINITION | jq --arg IMAGE "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$VERSION_TAG" '.taskDefinition.containerDefinitions | map(if .name == "sleep-app" then .image = $IMAGE else . end)')
 
+                        echo "Container definitions updated: $CONTAINER_DEFINITIONS"
+
                         # 注册新的任务定义
+                        echo "Registering new task definition"
                         NEW_TASK_DEFINITION=$(echo $TASK_DEFINITION | jq --argjson CONTAINER_DEFINITIONS "$CONTAINER_DEFINITIONS" '.taskDefinition | {family: .family, containerDefinitions: $CONTAINER_DEFINITIONS, volumes: .volumes, taskRoleArn: .taskRoleArn, executionRoleArn: .executionRoleArn, networkMode: .networkMode, requiresCompatibilities: .requiresCompatibilities, cpu: .cpu, memory: .memory}')
+
+                        echo "New task definition: $NEW_TASK_DEFINITION"
 
                         aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEFINITION"
 
                         # 更新 ECS 服务以使用新的任务定义
+                        echo "Updating ECS service: $ECS_SERVICE in cluster: $ECS_CLUSTER"
                         aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment
                         '''
                     }
