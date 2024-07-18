@@ -4,11 +4,11 @@ pipeline {
     environment {
         AWS_REGION = 'us-east-2'
         ECR_REPO = 'sleep-dev'
-        EKS_CLUSTER = 'sleep-dev-v1'
         GITHUB_REPO = 'https://github.com/Hughqj/sleep-dev.git'
         AWS_ACCOUNT_ID = '305090498954'
-        EKS_NAMESPACE = 'dev'
-        KUBECTL_PATH = '/root/bin/kubectl'  // 使用 kubectl 的绝对路径
+        ECS_CLUSTER = 'sleep-dev-ecs-v3'
+        ECS_SERVICE = 'sleep-dev'
+        ECS_TASK_DEFINITION = 'sleep-fargate'
     }
 
     stages {
@@ -81,14 +81,24 @@ pipeline {
             }
         }
 
-        stage('Deploy to EKS') {
+        stage('Deploy to ECS') {
             steps {
                 script {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                         sh '''
-                        aws eks --region $AWS_REGION update-kubeconfig --name $EKS_CLUSTER
-                        $KUBECTL_PATH set image deployment/sleep sleep=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$VERSION_TAG -n $EKS_NAMESPACE
-                        $KUBECTL_PATH rollout status deployment/sleep -n $EKS_NAMESPACE
+                        # 获取当前任务定义
+                        TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition $ECS_TASK_DEFINITION)
+
+                        # 提取容器定义并更新镜像版本
+                        CONTAINER_DEFINITIONS=$(echo $TASK_DEFINITION | jq --arg IMAGE "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$VERSION_TAG" '.taskDefinition.containerDefinitions | map(if .name == "sleep-app" then .image = $IMAGE else . end)')
+
+                        # 注册新的任务定义
+                        NEW_TASK_DEFINITION=$(echo $TASK_DEFINITION | jq --argjson CONTAINER_DEFINITIONS "$CONTAINER_DEFINITIONS" '.taskDefinition | {family: .family, containerDefinitions: $CONTAINER_DEFINITIONS, volumes: .volumes, taskRoleArn: .taskRoleArn, executionRoleArn: .executionRoleArn, networkMode: .networkMode, requiresCompatibilities: .requiresCompatibilities, cpu: .cpu, memory: .memory}')
+
+                        aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEFINITION"
+
+                        # 更新 ECS 服务以使用新的任务定义
+                        aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment
                         '''
                     }
                 }
