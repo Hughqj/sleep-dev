@@ -8,7 +8,7 @@ pipeline {
         AWS_ACCOUNT_ID = '305090498954'
         ECS_CLUSTER = 'sleep-dev-ecs-v3'
         ECS_SERVICE = 'sleep-dev'
-        ECS_TASK_DEFINITION = 'sleep-fargate'
+        ECS_TASK_DEFINITION = 'sleep-fargate:11'
     }
 
     stages {
