@@ -89,29 +89,37 @@ pipeline {
                         set -e
 
                         # 获取当前任务定义
-                        TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition $ECS_TASK_DEFINITION)
+                        TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition $ECS_TASK_DEFINITION | jq '.taskDefinition')
 
                         # 提取容器定义并更新镜像版本
-                        CONTAINER_DEFINITIONS=$(echo $TASK_DEFINITION | jq --arg IMAGE "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$VERSION_TAG" '.taskDefinition.containerDefinitions | map(if .name == "sleep-app" then .image = $IMAGE else . end)')
+                        CONTAINER_DEFINITIONS=$(echo $TASK_DEFINITION | jq --arg IMAGE "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$VERSION_TAG" '.containerDefinitions | map(if .name == "sleep-app" then .image = $IMAGE else . end)')
 
                         # 提取 taskRoleArn 和 executionRoleArn，确保它们不为空
-                        TASK_ROLE_ARN=$(echo $TASK_DEFINITION | jq -r '.taskDefinition.taskRoleArn // empty')
-                        EXECUTION_ROLE_ARN=$(echo $TASK_DEFINITION | jq -r '.taskDefinition.executionRoleArn // empty')
+                        TASK_ROLE_ARN=$(echo $TASK_DEFINITION | jq -r '.taskRoleArn // empty')
+                        EXECUTION_ROLE_ARN=$(echo $TASK_DEFINITION | jq -r '.executionRoleArn // empty')
 
                         # 构建新的任务定义
-                        NEW_TASK_DEFINITION=$(echo $TASK_DEFINITION | jq --argjson CONTAINER_DEFINITIONS "$CONTAINER_DEFINITIONS" --arg TASK_ROLE_ARN "$TASK_ROLE_ARN" --arg EXECUTION_ROLE_ARN "$EXECUTION_ROLE_ARN" '
-                        .taskDefinition |
-                        {
-                            family: .family,
-                            containerDefinitions: $CONTAINER_DEFINITIONS,
-                            volumes: .volumes,
-                            taskRoleArn: ($TASK_ROLE_ARN | select(. != "")),
-                            executionRoleArn: ($EXECUTION_ROLE_ARN | select(. != "")),
-                            networkMode: .networkMode,
-                            requiresCompatibilities: .requiresCompatibilities,
-                            cpu: .cpu,
-                            memory: .memory
-                        }')
+                        NEW_TASK_DEFINITION=$(jq -n \
+                        --arg family "$(echo $TASK_DEFINITION | jq -r '.family')" \
+                        --argjson containerDefinitions "$CONTAINER_DEFINITIONS" \
+                        --argjson volumes "$(echo $TASK_DEFINITION | jq '.volumes')" \
+                        --arg taskRoleArn "$TASK_ROLE_ARN" \
+                        --arg executionRoleArn "$EXECUTION_ROLE_ARN" \
+                        --arg networkMode "$(echo $TASK_DEFINITION | jq -r '.networkMode')" \
+                        --argjson requiresCompatibilities "$(echo $TASK_DEFINITION | jq '.requiresCompatibilities')" \
+                        --arg cpu "$(echo $TASK_DEFINITION | jq -r '.cpu')" \
+                        --arg memory "$(echo $TASK_DEFINITION | jq -r '.memory')" \
+                        '{
+                            family: $family,
+                            containerDefinitions: $containerDefinitions,
+                            volumes: $volumes,
+                            taskRoleArn: $taskRoleArn,
+                            executionRoleArn: $executionRoleArn,
+                            networkMode: $networkMode,
+                            requiresCompatibilities: $requiresCompatibilities,
+                            cpu: $cpu,
+                            memory: $memory
+                        } | del(.taskRoleArn | select(. == "")) | del(.executionRoleArn | select(. == ""))')
 
                         # 注册新的任务定义
                         aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEFINITION"
