@@ -89,32 +89,34 @@ pipeline {
                         set -e
 
                         # 获取当前任务定义
-                        echo "Fetching current task definition: $ECS_TASK_DEFINITION"
                         TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition $ECS_TASK_DEFINITION)
 
-                        if [ -z "$TASK_DEFINITION" ]; then
-                            echo "Error: Task definition $ECS_TASK_DEFINITION not found."
-                            exit 1
-                        fi
-
-                        echo "Task definition fetched successfully: $TASK_DEFINITION"
-
                         # 提取容器定义并更新镜像版本
-                        echo "Updating container definitions with new image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$VERSION_TAG"
                         CONTAINER_DEFINITIONS=$(echo $TASK_DEFINITION | jq --arg IMAGE "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$VERSION_TAG" '.taskDefinition.containerDefinitions | map(if .name == "sleep-app" then .image = $IMAGE else . end)')
 
-                        echo "Container definitions updated: $CONTAINER_DEFINITIONS"
+                        # 提取 taskRoleArn 和 executionRoleArn，确保它们不为空
+                        TASK_ROLE_ARN=$(echo $TASK_DEFINITION | jq -r '.taskDefinition.taskRoleArn // empty')
+                        EXECUTION_ROLE_ARN=$(echo $TASK_DEFINITION | jq -r '.taskDefinition.executionRoleArn // empty')
+
+                        # 构建新的任务定义
+                        NEW_TASK_DEFINITION=$(echo $TASK_DEFINITION | jq --argjson CONTAINER_DEFINITIONS "$CONTAINER_DEFINITIONS" --arg TASK_ROLE_ARN "$TASK_ROLE_ARN" --arg EXECUTION_ROLE_ARN "$EXECUTION_ROLE_ARN" '
+                        .taskDefinition |
+                        {
+                            family: .family,
+                            containerDefinitions: $CONTAINER_DEFINITIONS,
+                            volumes: .volumes,
+                            taskRoleArn: ($TASK_ROLE_ARN | select(. != "")),
+                            executionRoleArn: ($EXECUTION_ROLE_ARN | select(. != "")),
+                            networkMode: .networkMode,
+                            requiresCompatibilities: .requiresCompatibilities,
+                            cpu: .cpu,
+                            memory: .memory
+                        }')
 
                         # 注册新的任务定义
-                        echo "Registering new task definition"
-                        NEW_TASK_DEFINITION=$(echo $TASK_DEFINITION | jq --argjson CONTAINER_DEFINITIONS "$CONTAINER_DEFINITIONS" '.taskDefinition | {family: .family, containerDefinitions: $CONTAINER_DEFINITIONS, volumes: .volumes, taskRoleArn: .taskRoleArn, executionRoleArn: .executionRoleArn, networkMode: .networkMode, requiresCompatibilities: .requiresCompatibilities, cpu: .cpu, memory: .memory}')
-
-                        echo "New task definition: $NEW_TASK_DEFINITION"
-
                         aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEFINITION"
 
                         # 更新 ECS 服务以使用新的任务定义
-                        echo "Updating ECS service: $ECS_SERVICE in cluster: $ECS_CLUSTER"
                         aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment
                         '''
                     }
