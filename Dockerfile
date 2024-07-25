@@ -7,6 +7,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # 更新包列表并安装必要的软件包，包括 OpenJDK 17
 RUN apt-get update && \
     apt-get install -y openjdk-17-jre-headless && \
+    apt-get install -y curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
